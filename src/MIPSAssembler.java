@@ -34,58 +34,67 @@ public class MIPSAssembler {
 
         switch (opcode) {
             case "add":
-                return String.format("0x%08x", 0x00000020 | (register(parts[1]) << 11) | (register(parts[2]) << 21) | (register(parts[3]) << 16));
+                return formatRType(0x20, register(parts[1]), register(parts[2]), register(parts[3]));
             case "sub":
-                return String.format("0x%08x", 0x00000022 | (register(parts[1]) << 11) | (register(parts[2]) << 21) | (register(parts[3]) << 16));
+                return formatRType(0x22, register(parts[1]), register(parts[2]), register(parts[3]));
             case "and":
-                return String.format("0x%08x", 0x00000024 | (register(parts[1]) << 11) | (register(parts[2]) << 21) | (register(parts[3]) << 16));
+                return formatRType(0x24, register(parts[1]), register(parts[2]), register(parts[3]));
             case "or":
-                return String.format("0x%08x", 0x00000025 | (register(parts[1]) << 11) | (register(parts[2]) << 21) | (register(parts[3]) << 16));
-            case "sll":
-                return String.format("0x%08x", 0x00000000 | (register(parts[1]) << 11) | (register(parts[2]) << 16) | (immediate(parts[3]) << 6));
-            case "srl":
-                return String.format("0x%08x", 0x00000002 | (register(parts[1]) << 11) | (register(parts[2]) << 16) | (immediate(parts[3]) << 6));
+                return formatRType(0x25, register(parts[1]), register(parts[2]), register(parts[3]));
             case "sllv":
-                return String.format("0x%08x", 0x00000004 | (register(parts[3]) << 21) | (register(parts[2]) << 16) | (register(parts[1]) << 11) | 0x00);
+                return formatRType(0x04, register(parts[1]), register(parts[3]), register(parts[2]));
             case "srlv":
-                return String.format("0x%08x", 0x00000006 | (register(parts[3]) << 21) | (register(parts[2]) << 16) | (register(parts[1]) << 11) | 0x00);
+                return formatRType(0x06, register(parts[1]), register(parts[3]), register(parts[2]));
+            case "sll":
+                return formatShiftType(0x00, register(parts[1]), register(parts[2]), immediate(parts[3]));
+            case "srl":
+                return formatShiftType(0x02, register(parts[1]), register(parts[2]), immediate(parts[3]));
             case "addi":
-                return String.format("0x%08x", 0x20000000 | (register(parts[1]) << 16) | (register(parts[2]) << 21) | (immediate(parts[3]) & 0xFFFF));
+                return formatIType(0x20000000, register(parts[2]), register(parts[1]), immediate(parts[3]));
             case "andi":
-                return String.format("0x%08x", 0x30000000 | (register(parts[1]) << 16) | (register(parts[2]) << 21) | (immediate(parts[3]) & 0xFFFF));
+                return formatIType(0x30000000, register(parts[2]), register(parts[1]), immediate(parts[3]));
             case "lw":
-                return splitParanthesis(parts, 0x8C000000);
+                return formatMemoryType(0x8C000000, register(parts[1]), parts[2]);
             case "sw":
-                return splitParanthesis(parts, 0xAC000000);
+                return formatMemoryType(0xAC000000, register(parts[1]), parts[2]);
             case "beq":
-                return String.format("0x%08x", 0x10000000 | (register(parts[1]) << 21) | (register(parts[2]) << 16) | ((labels.get(parts[3]) - currentAddress - 4) >> 2 & 0xFFFF));
+                return formatBranchType(0x10000000, register(parts[1]), register(parts[2]), labels.get(parts[3]), currentAddress);
             case "bne":
-                return String.format("0x%08x", 0x14000000 | (register(parts[1]) << 21) | (register(parts[2]) << 16) | ((labels.get(parts[3]) - currentAddress - 4) >> 2 & 0xFFFF));
+                return formatBranchType(0x14000000, register(parts[1]), register(parts[2]), labels.get(parts[3]), currentAddress);
             case "blez":
-                return String.format("0x%08x", 0x18000000 | (register(parts[1]) << 21) | ((labels.get(parts[2]) - currentAddress - 4) >> 2 & 0xFFFF));
+                return formatBranchType(0x18000000, register(parts[1]), 0, labels.get(parts[2]), currentAddress);
             case "bgtz":
-                return String.format("0x%08x", 0x1C000000 | (register(parts[1]) << 21) | ((labels.get(parts[2]) - currentAddress - 4) >> 2 & 0xFFFF));
+                return formatBranchType(0x1C000000, register(parts[1]), 0, labels.get(parts[2]), currentAddress);
             case "j":
                 return String.format("0x%08x", 0x08000000 | ((labels.get(parts[1]) >> 2) & 0x3FFFFFF));
             default:
-                throw new IllegalArgumentException("Unsupported instruction: " + instruction);
+                throw new IllegalArgumentException("This instruction is not supported: " + instruction);
         }
     }
 
-    private static String splitParanthesis(String[] parts, int x) {
-        // Check if the immediate value is enclosed in parentheses
-        if (parts[2].contains("(") && parts[2].contains(")")) {
-        // Extract register and immediate value from the format "offset(base)"
-            String[] offsetAndBase = parts[2].split("[()]");
-            String offset = offsetAndBase[0];
-            String base = offsetAndBase[1].replace("$", "");
-            return String.format("0x%08x", x | (register(parts[1]) << 16) | (register(base) << 21) | (Integer.parseInt(offset) & 0xFFFF));
-        } else {
-        // Parse as usual
-            return String.format("0x%08x", x | (register(parts[1]) << 16) | (register(parts[3]) << 21) | (immediate(parts[2]) & 0xFFFF));
-        }
+    private static String formatRType(int funct, int rd, int rs, int rt) {
+        return String.format("0x%08x", funct | (rd << 11) | (rs << 21) | (rt << 16));
     }
 
+    private static String formatShiftType(int funct, int rd, int rt, int shamt) {
+        return String.format("0x%08x", funct | (rd << 11) | (rt << 16) | (shamt << 6));
+    }
+
+    private static String formatIType(int opcode, int rs, int rt, int immediate) {
+        return String.format("0x%08x", opcode | (rt << 16) | (rs << 21) | (immediate & 0xFFFF));
+    }
+
+    private static String formatMemoryType(int opcode, int rt, String offsetAndBase) {
+        String[] parts = offsetAndBase.split("[()]");
+        int offset = Integer.parseInt(parts[0]);
+        int base = register(parts[1].replace("$", ""));
+        return String.format("0x%08x", opcode | (rt << 16) | (base << 21) | (offset & 0xFFFF));
+    }
+
+    private static String formatBranchType(int opcode, int rs, int rt, int labelAddress, int currentAddress) {
+        int offset = (labelAddress - currentAddress - 4) >> 2;
+        return String.format("0x%08x", opcode | (rs << 21) | (rt << 16) | (offset & 0xFFFF));
+    }
 
     private static int register(String reg) {
         return Integer.parseInt(reg.replace("$", ""));
