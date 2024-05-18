@@ -73,27 +73,27 @@ public class MIPSAssembler {
     }
 
     private static String formatRType(int funct, int rd, int rs, int rt) {
-        return String.format("0x%08x", funct | (rd << 11) | (rs << 21) | (rt << 16));
+        return String.format("0x%08x", funct + (rd * (1 << 11)) + (rs * (1 << 21)) + (rt * (1 << 16)));
     }
 
     private static String formatShiftType(int funct, int rd, int rt, int shamt) {
-        return String.format("0x%08x", funct | (rd << 11) | (rt << 16) | (shamt << 6));
+        return String.format("0x%08x", funct + (rd * (1 << 11)) + (rt * (1 << 16)) + (shamt * (1 << 6)));
     }
 
     private static String formatIType(int opcode, int rs, int rt, int immediate) {
-        return String.format("0x%08x", opcode | (rt << 16) | (rs << 21) | (immediate & 0xFFFF));
+        return String.format("0x%08x", opcode + (rt * (1<< 16)) + (rs * (1 << 21)) + (immediate & 0xFFFF));
     }
 
     private static String formatMemoryType(int opcode, int rt, String offsetAndBase) {
         String[] parts = offsetAndBase.split("[()]");
         int offset = Integer.parseInt(parts[0]);
         int base = register(parts[1].replace("$", ""));
-        return String.format("0x%08x", opcode | (rt << 16) | (base << 21) | (offset & 0xFFFF));
+        return String.format("0x%08x", opcode + (rt * (1<< 16)) + (base * (1<< 21)) + (offset & 0xFFFF));
     }
 
     private static String formatBranchType(int opcode, int rs, int rt, int labelAddress, int currentAddress) {
-        int offset = (labelAddress - currentAddress - 4) >> 2;
-        return String.format("0x%08x", opcode | (rs << 21) | (rt << 16) | (offset & 0xFFFF));
+        int offset = (labelAddress - currentAddress - 4) / 4; //offset 16 bit rt 5 bit rs 5 bit
+        return String.format("0x%08x", opcode + (rs * (1 << 21)) + (rt * (1 << 16)) + (offset & 0xFFFF));
     }
 
     private static int register(String reg) {
