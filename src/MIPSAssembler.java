@@ -54,29 +54,9 @@ public class MIPSAssembler {
             case "andi":
                 return String.format("0x%08x", 0x30000000 | (register(parts[1]) << 16) | (register(parts[2]) << 21) | (immediate(parts[3]) & 0xFFFF));
             case "lw":
-                // Check if the immediate value is enclosed in parentheses
-                if (parts[2].contains("(") && parts[2].contains(")")) {
-                    // Extract register and immediate value from the format "offset(base)"
-                    String[] offsetAndBase = parts[2].split("[()]");
-                    String offset = offsetAndBase[0];
-                    String base = offsetAndBase[1].replace("$", "");
-                    return String.format("0x%08x", 0x8C000000 | (register(parts[1]) << 16) | (register(base) << 21) | (Integer.parseInt(offset) & 0xFFFF));
-                } else {
-                    // Parse as usual
-                    return String.format("0x%08x", 0x8C000000 | (register(parts[1]) << 16) | (register(parts[3]) << 21) | (immediate(parts[2]) & 0xFFFF));
-                }
+                return splitParanthesis(parts, 0x8C000000);
             case "sw":
-                // Check if the immediate value is enclosed in parentheses
-                if (parts[2].contains("(") && parts[2].contains(")")) {
-                    // Extract register and immediate value from the format "offset(base)"
-                    String[] offsetAndBase = parts[2].split("[()]");
-                    String offset = offsetAndBase[0];
-                    String base = offsetAndBase[1].replace("$", "");
-                    return String.format("0x%08x", 0xAC000000 | (register(parts[1]) << 16) | (register(base) << 21) | (Integer.parseInt(offset) & 0xFFFF));
-                } else {
-                    // Parse as usual
-                    return String.format("0x%08x", 0xAC000000 | (register(parts[1]) << 16) | (register(parts[3]) << 21) | (immediate(parts[2]) & 0xFFFF));
-                }
+                return splitParanthesis(parts, 0xAC000000);
             case "beq":
                 return String.format("0x%08x", 0x10000000 | (register(parts[1]) << 21) | (register(parts[2]) << 16) | ((labels.get(parts[3]) - currentAddress - 4) >> 2 & 0xFFFF));
             case "bne":
@@ -89,6 +69,20 @@ public class MIPSAssembler {
                 return String.format("0x%08x", 0x08000000 | ((labels.get(parts[1]) >> 2) & 0x3FFFFFF));
             default:
                 throw new IllegalArgumentException("Unsupported instruction: " + instruction);
+        }
+    }
+
+    private static String splitParanthesis(String[] parts, int x) {
+        // Check if the immediate value is enclosed in parentheses
+        if (parts[2].contains("(") && parts[2].contains(")")) {
+        // Extract register and immediate value from the format "offset(base)"
+            String[] offsetAndBase = parts[2].split("[()]");
+            String offset = offsetAndBase[0];
+            String base = offsetAndBase[1].replace("$", "");
+            return String.format("0x%08x", x | (register(parts[1]) << 16) | (register(base) << 21) | (Integer.parseInt(offset) & 0xFFFF));
+        } else {
+        // Parse as usual
+            return String.format("0x%08x", x | (register(parts[1]) << 16) | (register(parts[3]) << 21) | (immediate(parts[2]) & 0xFFFF));
         }
     }
 
@@ -119,5 +113,15 @@ public class MIPSAssembler {
         List<String> machineCode = new ArrayList<>();
 
         lines.removeIf(line -> line.startsWith("#") || line.isEmpty()); // Remove comments and empty lines
+
+        int address = 0x00400000;
+        for (String line : lines) {
+            if (!line.endsWith(":") && !line.startsWith(".")) {
+                String code = translateInstruction(line, labels, address);
+                machineCode.add(code);
+                address += 4;
+            }
+        }
+        writeOutputFile(inputFilename, machineCode);
     }
 }
